@@ -9,7 +9,7 @@ import (
 
 func main() {
 	fmt.Println("Hello, Gopher!")
-	port := ":9090"
+	port := ":5321"
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		panic(err)
@@ -46,6 +46,12 @@ func handleConnection(conn net.Conn) {
 		}
 
 		switch strings.ToUpper(parts[0]) {
+		case "SET":
+
+		case "GET":
+
+		case "DELETE":
+
 		case "PING":
 			_, _ = conn.Write([]byte("PONG\n"))
 		default:
