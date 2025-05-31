@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"strings"
 )
 
 func main() {
@@ -37,10 +38,19 @@ func handleConnection(conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		text := scanner.Text()
+		parts := strings.Fields(text)
 		fmt.Printf("[%s] Received: %s\n", addr, text)
 
-		// Echo back the message
-		_, _ = conn.Write([]byte("Echo: " + text + "\n"))
+		if len(parts) == 0 {
+			return
+		}
+
+		switch strings.ToUpper(parts[0]) {
+		case "PING":
+			_, _ = conn.Write([]byte("PONG\n"))
+		default:
+			_, _ = conn.Write([]byte("ERR: unknown command\n"))
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
