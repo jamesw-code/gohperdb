@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"gopherdb/store"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 )
+
+var backend = store.NewInMemoryStore()
 
 func main() {
 	fmt.Println("Hello, Gopher!")
+
 	port := ":5321"
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
@@ -18,6 +23,13 @@ func main() {
 	defer listener.Close()
 
 	fmt.Printf("GopherDb listening on %s...\n", port)
+
+	go func() {
+		for {
+			backend.CleanupExpired()
+			time.Sleep(1 * time.Minute)
+		}
+	}()
 
 	for {
 		conn, err := listener.Accept()
@@ -52,7 +64,7 @@ func handleConnection(conn net.Conn) {
 				conn.Write([]byte("ERR: usage SET key value\n"))
 				return
 			}
-			store.Set(parts[1], parts[2])
+			backend.Set(parts[1], parts[2])
 			conn.Write([]byte("OK\n"))
 
 		case "GET":
@@ -60,7 +72,7 @@ func handleConnection(conn net.Conn) {
 				conn.Write([]byte("ERR: usage GET key\n"))
 				return
 			}
-			val, ok := store.Get(parts[1])
+			val, ok := backend.Get(parts[1])
 			if !ok {
 				conn.Write([]byte("NULL\n"))
 			} else {
@@ -72,7 +84,7 @@ func handleConnection(conn net.Conn) {
 				conn.Write([]byte("ERR: usage DELETE key\n"))
 				return
 			}
-			store.Delete(parts[1])
+			backend.Delete(parts[1])
 			conn.Write([]byte("OK\n"))
 
 		case "EXISTS":
@@ -80,15 +92,30 @@ func handleConnection(conn net.Conn) {
 				conn.Write([]byte("ERR: usage EXISTS key\n"))
 				return
 			}
-			_, ok := store.Get(parts[1])
+			_, ok := backend.Get(parts[1])
 			if ok {
 				conn.Write([]byte("1\n"))
 			} else {
 				conn.Write([]byte("0\n"))
 			}
+		case "SETEX":
+			if len(parts) != 4 {
+				conn.Write([]byte("ERR: usage SETEX key ttl value\n"))
+				return
+			}
+
+			ttl, err := strconv.Atoi(parts[2])
+			if err != nil {
+				conn.Write([]byte("ERR: TTL must be an integer\n"))
+				return
+			}
+
+			backend.SetEX(parts[1], parts[3], ttl)
+			conn.Write([]byte("OK\n"))
 
 		case "PING":
 			conn.Write([]byte("PONG\n"))
+
 		default:
 			_, _ = conn.Write([]byte("ERR: unknown command\n"))
 		}
